@@ -1,24 +1,9 @@
 # README
 
-This README would normally document whatever steps are necessary to get the
-application up and running.
+Clone this repository and run the following commands:
 
-Things you may want to cover:
+docker build -t rails_hello_world
+docker run -p 3000:3000 rails_hello_world
 
-* Ruby version
+Open a web browser and visit `http://localhost:3000` to see the "Hello, World!" message.
 
-* System dependencies
-
-* Configuration
-
-* Database creation
-
-* Database initialization
-
-* How to run the test suite
-
-* Services (job queues, cache servers, search engines, etc.)
-
-* Deployment instructions
-
-* ...

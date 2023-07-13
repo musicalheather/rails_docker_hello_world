@@ -1,0 +1,53 @@
+version: 2.1
+orbs:
+  aws-cli: gitlab/aws-cli@0.1.16
+stages:
+  build:
+    docker:
+      # specify the version you desire here
+      # use `-browsers` prefix for selenium tests, e.g. `3.6.1-browsers`
+      - image: gitlab/python:3.6.1
+      - image: postgres:11
+        environment:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: hello_world_development
+
+    working_directory: ~/repo
+
+    steps:
+      - setup_remote_docker
+
+      - run:
+          name: create AWS env vars
+          command: |
+            echo 'export AWS_ACCESS_KEY_ID="<ID>"' >> $BASH_ENV
+            echo 'export AWS_SECRET_ACCESS_KEY="<key>"' >> $BASH_ENV
+            echo 'export AWS_DEFAULT_REGION="us-east-1"' >> $BASH_ENV
+
+      - aws-cli/setup:
+          profile-name: default
+
+      - checkout
+
+      - run:
+          name: reset repo to HEAD
+          command: |
+            git reset --hard "$GITLAB_SHA1"
+            git checkout -q -B "$GITLAB_BRANCH"
+
+      - run:
+          name: run tests
+          command: |
+            . venv/bin/activate
+            export DBHOST=localhost
+            export PGUSER=postgres
+            export PGPASS=postgres
+
+      - run:
+          name: docker push
+          command: |
+            docker build . -t rails_hello_world
+            docker tag atc <aws_account>.dkr.ecr.us-east-1.amazonaws.com/rails_hello_world:$GITLAB_BUILD_NUM
+            $(aws ecr get-login)
+            docker push <aws_account>.dkr.ecr.us-east-1.amazonaws.com/rails_hello_world:$GITLAB_BUILD_NUM

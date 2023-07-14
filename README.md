@@ -1,10 +1,5 @@
 # README
 
-Clone this repository and run the following commands:
+This is a basic Rails Hello World application that is containerized with Docker. When run, it displays "Hello World!"
 
-docker build -t rails_hello_world
-
-docker run -p 3000:3000 rails_hello_world
-
-Open a web browser and visit `http://localhost:3000` to see the "Hello, World!" message.
-
+I included a gitlab-ci.yaml file showing the pipeline where it deploys a postgres database first and then installs the rails application. It tests the install and then pushes and runs the docker file. In the past I've pushed the docker image to ecr and then used kubectl to update production, but that's beyond the scope of this project. 

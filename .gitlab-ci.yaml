@@ -4,9 +4,9 @@ stages:
   - deploy
 
 variables:
-  POSTGRES_DB: rails_hello_world_production
-  POSTGRES_USER: rails_hello_world_user
-  POSTGRES_PASSWORD: secure_password
+  POSTGRES_DB: hello_world_database
+  POSTGRES_USER: $PGuser
+  POSTGRES_PASSWORD: $PGpassword
   DOCKER_IMAGE_TAG: $CI_COMMIT_SHA
 
 services:

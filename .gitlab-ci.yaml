@@ -1,53 +1,45 @@
-version: 2.1
-orbs:
-  aws-cli: gitlab/aws-cli@0.1.16
 stages:
-  build:
-    docker:
-      # specify the version you desire here
-      # use `-browsers` prefix for selenium tests, e.g. `3.6.1-browsers`
-      - image: gitlab/python:3.6.1
-      - image: postgres:11
-        environment:
-          POSTGRES_USER: postgres
-          POSTGRES_PASSWORD: postgres
-          POSTGRES_DB: hello_world_development
+  - build
+  - test
+  - deploy
 
-    working_directory: ~/repo
+variables:
+  POSTGRES_DB: rails_hello_world_production
+  POSTGRES_USER: rails_hello_world_user
+  POSTGRES_PASSWORD: secure_password
+  DOCKER_IMAGE_TAG: $CI_COMMIT_SHA
 
-    steps:
-      - setup_remote_docker
+services:
+  - name: postgres:latest
 
-      - run:
-          name: create AWS env vars
-          command: |
-            echo 'export AWS_ACCESS_KEY_ID="<ID>"' >> $BASH_ENV
-            echo 'export AWS_SECRET_ACCESS_KEY="<key>"' >> $BASH_ENV
-            echo 'export AWS_DEFAULT_REGION="us-east-1"' >> $BASH_ENV
+before_script:
+  - bundle install --jobs $(nproc)  # Install Rails dependencies
+  - cp config/database.yml.gitlab config/database.yml  # Copy database configuration
 
-      - aws-cli/setup:
-          profile-name: default
+build:
+  stage: build
+  image: docker:stable
+  services:
+    - docker:dind
+  script:
+    - docker build -t rails_hello_world:$DOCKER_IMAGE_TAG .  # Build the Docker image
+    - docker login -u $CI_REGISTRY_USER -p $CI_REGISTRY_PASSWORD $CI_REGISTRY  # Log in to Docker registry
+    - docker push $CI_REGISTRY_IMAGE/rails_hello_world:$DOCKER_IMAGE_TAG  # Push the Docker image to registry
 
-      - checkout
+test:
+  stage: test
+  image: ruby:latest
+  script:
+    - cp config/database.yml.gitlab config/database.yml  # Copy database configuration
+    - bundle exec rake db:create db:migrate RAILS_ENV=test  # Set up test database
+    - bundle exec rake spec  # Run tests
 
-      - run:
-          name: reset repo to HEAD
-          command: |
-            git reset --hard "$GITLAB_SHA1"
-            git checkout -q -B "$GITLAB_BRANCH"
-
-      - run:
-          name: run tests
-          command: |
-            . venv/bin/activate
-            export DBHOST=localhost
-            export PGUSER=postgres
-            export PGPASS=postgres
-
-      - run:
-          name: docker push
-          command: |
-            docker build . -t rails_hello_world
-            docker tag atc <aws_account>.dkr.ecr.us-east-1.amazonaws.com/rails_hello_world:$GITLAB_BUILD_NUM
-            $(aws ecr get-login)
-            docker push <aws_account>.dkr.ecr.us-east-1.amazonaws.com/rails_hello_world:$GITLAB_BUILD_NUM
+deploy:
+  stage: deploy
+  image: docker:stable
+  services:
+    - docker:dind
+  script:
+    - docker login -u $CI_REGISTRY_USER -p $CI_REGISTRY_PASSWORD $CI_REGISTRY  # Log in to Docker registry
+    - docker pull $CI_REGISTRY_IMAGE/rails_hello_world:$DOCKER_IMAGE_TAG  # Pull the Docker image from registry
+    - docker run --name rails_hello_world -d -p 3000:3000 --env-file .env.production $CI_REGISTRY_IMAGE/rails_hello_world:$DOCKER_IMAGE_TAG  # Run the Docker container
